@@ -27,6 +27,7 @@ agent.py — интерактивный чат-агент через OpenAI-со
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -58,7 +59,7 @@ RUN_SHELL_TOOL = {
     "function": {
         "name": "run_shell",
         "description": (
-            "Выполняет переданную строку команды в полноценном shell (/bin/bash) "
+            "Выполняет переданную строку команды в полноценном shell (bash/sh) "
             "на компьютере пользователя и возвращает stdout, stderr и код возврата."
         ),
         "parameters": {
@@ -130,11 +131,14 @@ def save_history(messages):
             f.write(json.dumps(m, ensure_ascii=False) + "\n")
 
 
+SHELL_BIN = shutil.which("bash") or shutil.which("sh") or "/bin/sh"
+
+
 def run_shell(command, timeout=60):
-    """Полноценный shell: выполнение команды через /bin/bash."""
+    """Полноценный shell: выполнение команды через bash (при его наличии - sh)."""
     try:
         p = subprocess.run(
-            ["/bin/bash", "-lc", command],
+            [SHELL_BIN, "-lc", command],
             capture_output=True,
             text=True,
             timeout=timeout,
