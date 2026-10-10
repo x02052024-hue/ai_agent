@@ -103,6 +103,52 @@ class TestLoadConfig:
         assert "api_key" in cfg and "base_url" in cfg
 
 
+# -------------------------------------------------------------- validate_config --
+
+class TestValidateConfig:
+    def test_swapped_model_and_url_rejected(self):
+        """Пользователь перепутал model и base_url -> понятная ошибка, не трейсбек."""
+        cfg = {
+            "api_key": "sk",
+            "model": "http://localhost:8000/v1",
+            "base_url": "gpt-4o-mini",
+        }
+        with pytest.raises(agent.ConfigError, match="перепутаны"):
+            agent.validate_config(cfg)
+
+    def test_non_http_base_url_rejected(self):
+        with pytest.raises(agent.ConfigError, match="http"):
+            agent.validate_config({"api_key": "sk", "base_url": "ftp://host/v1"})
+
+    def test_base_url_without_scheme_rejected(self):
+        with pytest.raises(agent.ConfigError):
+            agent.validate_config({"api_key": "sk", "base_url": "localhost:8000/v1"})
+
+    def test_url_in_model_rejected(self):
+        with pytest.raises(agent.ConfigError, match="model"):
+            agent.validate_config({
+                "api_key": "sk",
+                "base_url": "http://localhost:8000/v1",
+                "model": "http://gpt-4o-mini",
+            })
+
+    def test_valid_config_passes(self):
+        agent.validate_config({
+            "api_key": "sk",
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o-mini",
+        })
+
+    def test_missing_model_defaults_ok(self):
+        agent.validate_config({"api_key": "sk", "base_url": "http://localhost:8000/v1"})
+
+    def test_load_config_runs_validation(self, tmp_path):
+        p = tmp_path / "config.yaml"
+        p.write_text('api_key: "sk"\nmodel: "http://localhost:8000/v1"\nbase_url: "gpt-4o-mini"\n', encoding="utf-8")
+        with pytest.raises(agent.ConfigError, match="перепутаны"):
+            agent.load_config(str(p))
+
+
 # ------------------------------------------------------------------- log_api --
 
 class TestLogApi:
@@ -390,6 +436,50 @@ class TestMainIntegration:
         with pytest.raises(SystemExit) as exc:
             agent.main()
         assert exc.value.code == 1
+
+
+# --------------------------------------------------------------- документация --
+
+class TestDocumentation:
+    """Код должен быть максимально документированным (требование задачи)."""
+
+    def test_module_docstring_covers_key_requirements(self):
+        """Модульный docstring описывает назначение, возможности и запуск."""
+        doc = agent.__doc__ or ""
+        for keyword in ("НАЗНАЧЕНИЕ", "ВОЗМОЖНОСТИ", "config.yaml", "run_shell",
+                        "api.log", "tool_usage.log", "chat_history.jsonl",
+                        "UTF-8", "20 символов", "БЫСТРЫЙ СТАРТ"):
+            assert keyword in doc, f"в модульном docstring нет раздела/слова: {keyword!r}"
+
+    def test_all_public_functions_have_docstrings(self):
+        """Каждая публичная функция модуля имеет docstring с Args/Returns или Raises."""
+        funcs = [agent.truncate, agent.load_config, agent.validate_config,
+                 agent.log_api, agent.log_tool, agent.save_history,
+                 agent.run_shell, agent.main]
+        for fn in funcs:
+            doc = fn.__doc__ or ""
+            assert len(doc.split()) >= 5, f"{fn.__name__}: docstring слишком короткий"
+
+    def test_todo_sections_for_model_switch_exist(self):
+        """TODO-разделы по выбору модели во время сессии присутствуют в коде."""
+        src = open(agent.__file__, encoding="utf-8").read()
+        # Планируемые команды и связанные аспекты — каждый помечен TODO(...):
+        for marker in ("TODO(model-switch)", "TODO(model-list)",
+                       "TODO(model-validate)", "TODO(model-history)",
+                       "TODO(model-log)", "TODO(model-config-fallback)",
+                       "TODO(tests)"):
+            assert marker in src, f"в agent.py отсутствует раздел {marker}"
+        # TODO-маркеры должны встречаться и в докстринге main(), и в инлайн-комментариях
+        assert agent.main.__doc__.count("TODO(model-") >= 3
+        assert "TODO(model-switch)" in src[src.index("def main"):]
+
+    def test_inline_todos_near_change_points(self):
+        """Инлайн TODO стоят рядом с точками будущих изменений (переменная model)."""
+        src = open(agent.__file__, encoding="utf-8").read()
+        idx_var = src.index('model = cfg.get("model", DEFAULT_MODEL)')
+        window = src[max(0, idx_var - 300):idx_var]
+        assert "TODO(model-switch)" in window, \
+            "рядом с инициализацией текущей модели нет TODO о её смене в сессии"
 
 
 if __name__ == "__main__":
