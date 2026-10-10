@@ -103,6 +103,52 @@ class TestLoadConfig:
         assert "api_key" in cfg and "base_url" in cfg
 
 
+# -------------------------------------------------------------- validate_config --
+
+class TestValidateConfig:
+    def test_swapped_model_and_url_rejected(self):
+        """Пользователь перепутал model и base_url -> понятная ошибка, не трейсбек."""
+        cfg = {
+            "api_key": "sk",
+            "model": "http://localhost:8000/v1",
+            "base_url": "gpt-4o-mini",
+        }
+        with pytest.raises(agent.ConfigError, match="перепутаны"):
+            agent.validate_config(cfg)
+
+    def test_non_http_base_url_rejected(self):
+        with pytest.raises(agent.ConfigError, match="http"):
+            agent.validate_config({"api_key": "sk", "base_url": "ftp://host/v1"})
+
+    def test_base_url_without_scheme_rejected(self):
+        with pytest.raises(agent.ConfigError):
+            agent.validate_config({"api_key": "sk", "base_url": "localhost:8000/v1"})
+
+    def test_url_in_model_rejected(self):
+        with pytest.raises(agent.ConfigError, match="model"):
+            agent.validate_config({
+                "api_key": "sk",
+                "base_url": "http://localhost:8000/v1",
+                "model": "http://gpt-4o-mini",
+            })
+
+    def test_valid_config_passes(self):
+        agent.validate_config({
+            "api_key": "sk",
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o-mini",
+        })
+
+    def test_missing_model_defaults_ok(self):
+        agent.validate_config({"api_key": "sk", "base_url": "http://localhost:8000/v1"})
+
+    def test_load_config_runs_validation(self, tmp_path):
+        p = tmp_path / "config.yaml"
+        p.write_text('api_key: "sk"\nmodel: "http://localhost:8000/v1"\nbase_url: "gpt-4o-mini"\n', encoding="utf-8")
+        with pytest.raises(agent.ConfigError, match="перепутаны"):
+            agent.load_config(str(p))
+
+
 # ------------------------------------------------------------------- log_api --
 
 class TestLogApi:
