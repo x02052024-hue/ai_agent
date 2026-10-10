@@ -85,17 +85,23 @@ def truncate(text, limit=20):
     return text[:limit]
 
 
+class ConfigError(Exception):
+    """Ошибка конфигурации (отсутствует файл или обязательные параметры)."""
+
+
 def load_config(path):
     if not os.path.exists(path):
-        print(f"Не найден файл конфигурации: {path}")
-        print("Создайте его по примеру:\n" + EXAMPLE_CONFIG)
-        sys.exit(1)
+        raise ConfigError(
+            f"Не найден файл конфигурации: {path}\n"
+            "Создайте его по примеру:\n" + EXAMPLE_CONFIG
+        )
     with open(path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
+    if not isinstance(cfg, dict):
+        raise ConfigError(f"Файл {path} не содержит корректных параметров.")
     for key in ("api_key", "base_url"):
         if key not in cfg:
-            print(f"В {path} отсутствует обязательный параметр '{key}'.")
-            sys.exit(1)
+            raise ConfigError(f"В {path} отсутствует обязательный параметр '{key}'.")
     return cfg
 
 
@@ -151,7 +157,11 @@ def run_shell(command, timeout=60):
 
 
 def main():
-    cfg = load_config(CONFIG_PATH)
+    try:
+        cfg = load_config(CONFIG_PATH)
+    except ConfigError as e:
+        print(e)
+        sys.exit(1)
     client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
     model = cfg.get("model", "gpt-4o-mini")
 
