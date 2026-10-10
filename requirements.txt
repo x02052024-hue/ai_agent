@@ -1,0 +1,5 @@
+# Зависимости для agent.py (программа)
+# Установка: pip install -r requirements.txt
+
+openai>=1.30,<2.0     # Клиент OpenAI-совместимого API (chat.completions, tools/function_call)
+PyYAML>=6.0,<7.0      # Чтение конфигурации из ../config.yaml

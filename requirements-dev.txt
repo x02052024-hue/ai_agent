@@ -1,0 +1,7 @@
+# Зависимости для модульного тестирования test_agent.py
+# Установка: pip install -r requirements-dev.txt
+# Запуск тестов: python -m pytest test_agent.py -v -p no:libtmux
+
+-r requirements.txt   # основные зависимости программы
+
+pytest>=8.0,<9.0      # фреймворк модульного тестирования (фикстуры tmp_path, monkeypatch)
